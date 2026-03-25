@@ -4,6 +4,15 @@
 
 # TradingView Widget Card for Home Assistant
 
+![Downloads](https://img.shields.io/github/downloads/cataseven/Tradingview-Widget-Card/total?color=41BDF5&logo=home-assistant&label=Downloads&suffix=%20downloads&style=for-the-badge)
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/frontend)
+[![GitHub Release](https://img.shields.io/github/release/cataseven/Tradingview-Widget-Card.svg)](https://github.com/cataseven/Tradingview-Widget-Card/releases)
+[![License](https://img.shields.io/github/license/cataseven/Tradingview-Widget-Card.svg)](LICENSE)
+![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1.0%2B-blue.svg)
+![Maintenance](https://img.shields.io/maintenance/yes/2026.svg)
+[![GitHub Stars](https://img.shields.io/github/stars/cataseven/Tradingview-Widget-Card?style=social)](https://github.com/cataseven/Tradingview-Widget-Card)
+[![GitHub Issues](https://img.shields.io/github/issues/cataseven/Tradingview-Widget-Card?style=flat-square)](https://github.com/cataseven/Tradingview-Widget-Card/issues)
+
 This custom card allows you to embed **ten different**, fully configurable TradingView widgets into your Home Assistant dashboards. With a single card file, you can display market data in a variety of formats.
 
 This card is a bridge to Tradingview widgets and all card ui or visual things are managed by Tradingview!
