@@ -571,78 +571,55 @@ class TradingViewWidgetCardEditor extends LitElement {
   static get properties() {
     return {
       hass: {},
-      _config: { state: true }
+      _config: {
+        state: true
+      }
     };
   }
 
   setConfig(config) {
     this._config = config;
   }
-
-  // ✅ FIXED VALUE HANDLER
+  
   _valueChanged(event, configKey) {
     if (!configKey) return;
-
-    let value;
-
-    // ✅ Correct handling for ha-select
-    if (event.detail && event.detail.value !== undefined) {
-      value = event.detail.value;
-    } else {
-      const target = event.currentTarget || event.target;
-      value = target.checked !== undefined ? target.checked : target.value;
+    
+    const target = event.currentTarget || event.target;
+    let value = target.checked !== undefined ? target.checked : target.value;
+    
+    if (this._config[configKey] === value) {
+      return;
     }
-
-    if (this._config[configKey] === value) return;
-
+    
     let newConfig;
-
     if (configKey === "widget_type") {
       const defaultWidgetConfig = WIDGET_DEFAULTS_TEMP[value] || {};
       const baseEditorConfig = {
         color_theme: this._config.color_theme || "dark",
         locale: this._config.locale || "en",
-        is_transparent:
-          this._config.is_transparent !== undefined
-            ? this._config.is_transparent
-            : defaultWidgetConfig.is_transparent || false,
+        is_transparent: this._config.is_transparent !== undefined ? this._config.is_transparent : defaultWidgetConfig.is_transparent || false,
         title: this._config.title
       };
-
-      newConfig = {
+      const mergedConfig = {
         type: "custom:tradingview-widget-card",
         ...defaultWidgetConfig,
         ...baseEditorConfig
       };
+      newConfig = mergedConfig;
     } else {
-      newConfig = { ...this._config };
-
-      if (
-        ["pairs", "currencies", "country_filter"].includes(configKey)
-      ) {
-        if (
-          !["market-overview", "stock-market-hotlists", "market-quotes"].includes(
-            newConfig.widget_type
-          )
-        ) {
-          if (
-            ["single-quote", "technical-analysis"].includes(
-              newConfig.widget_type
-            ) &&
-            configKey === "pairs"
-          ) {
+      const clonedConfig = {
+        ...this._config
+      };
+      newConfig = clonedConfig;
+      if (configKey === "pairs" || configKey === "currencies" || configKey === "country_filter") {
+        if (!["market-overview", "stock-market-hotlists", "market-quotes"].includes(newConfig.widget_type)) {
+          if (["single-quote", "technical-analysis"].includes(newConfig.widget_type) && configKey === "pairs") {
             value = value.trim() ? [value.trim()] : [];
-          } else if (
-            newConfig.widget_type === "economic-calendar" &&
-            configKey === "country_filter"
-          ) {
-            value = Array.isArray(value)
-              ? value.map((v) => v.trim()).filter(Boolean).join(",")
-              : value;
+          } else if (newConfig.widget_type === "economic-calendar" && configKey === "country_filter") {
+            value = Array.isArray(value) ? value.map(val => val.trim()).filter(Boolean).join(",") : value;
           } else {
-            value = value.split(",").map((v) => v.trim()).filter(Boolean);
+            value = value.split(",").map(val => val.trim()).filter(Boolean);
           }
-
           if (Array.isArray(value) && value.length === 0) {
             delete newConfig[configKey];
           } else {
@@ -656,114 +633,562 @@ class TradingViewWidgetCardEditor extends LitElement {
       } else {
         newConfig[configKey] = value;
       }
-
       if (configKey === "feed_mode") {
-        if (newConfig.feed_mode !== "symbol") delete newConfig.symbol;
-        if (newConfig.feed_mode !== "market") delete newConfig.market;
+        if (newConfig.feed_mode !== "symbol") {
+          delete newConfig.symbol;
+        }
+        if (newConfig.feed_mode !== "market") {
+          delete newConfig.market;
+        }
         if (newConfig.feed_mode === "market" && !newConfig.market) {
           newConfig.market = "crypto";
         }
       }
     }
-
     this._config = newConfig;
     this._dispatchConfigChanged(newConfig);
   }
-
+  
   _dispatchConfigChanged(config) {
-    this.dispatchEvent(
-      new CustomEvent("config-changed", {
-        detail: { config },
-        bubbles: true,
-        composed: true
-      })
-    );
+    const detailObj = {
+      config: config
+    };
+    const eventOptions = {
+      detail: detailObj,
+      bubbles: true,
+      composed: true
+    };
+    this.dispatchEvent(new CustomEvent("config-changed", eventOptions));
   }
-
+  
+  _addCurrency(event) {
+    const target = event.currentTarget || event.target;
+    if (!target.value) {
+      return;
+    }
+    const currency = target.value;
+    const currentCurrencies = this._config.currencies || [];
+    if (!currentCurrencies.includes(currency)) {
+      const newConfig = {
+        ...this._config,
+        currencies: [...currentCurrencies, currency].sort()
+      };
+      this._config = newConfig;
+      this._dispatchConfigChanged(newConfig);
+    }
+    target.value = "";
+  }
+  
+  _removeCurrency(event) {
+    const currencyToRemove = event.currentTarget.currency;
+    const currentCurrencies = this._config.currencies || [];
+    const newConfig = {
+      ...this._config,
+      currencies: currentCurrencies.filter(c => c !== currencyToRemove)
+    };
+    this._config = newConfig;
+    this._dispatchConfigChanged(newConfig);
+  }
+  
+  _addCountry(event) {
+    const target = event.currentTarget || event.target;
+    if (!target.value) {
+      return;
+    }
+    const countryStr = target.value;
+    let currentCountries = this._config.country_filter ? this._config.country_filter.split(",") : [];
+    let newCountries = [...currentCountries];
+    if (countryStr.includes(",")) {
+      const countriesToAdd = countryStr.split(",");
+      countriesToAdd.forEach(c => {
+        if (!newCountries.includes(c)) {
+          newCountries.push(c);
+        }
+      });
+    } else if (!newCountries.includes(countryStr)) {
+      newCountries.push(countryStr);
+    }
+    newCountries.sort();
+    const newConfig = {
+      ...this._config,
+      country_filter: newCountries.join(",")
+    };
+    this._config = newConfig;
+    this._dispatchConfigChanged(newConfig);
+    target.value = "";
+  }
+  
+  _removeCountry(event) {
+    const countryToRemove = event.currentTarget.country;
+    let currentCountries = this._config.country_filter ? this._config.country_filter.split(",") : [];
+    let filteredCountries = currentCountries.filter(c => c !== countryToRemove);
+    const newConfig = {
+      ...this._config,
+      country_filter: filteredCountries.join(",") === "" ? undefined : filteredCountries.join(",")
+    };
+    this._config = newConfig;
+    this._dispatchConfigChanged(newConfig);
+  }
+  
   render() {
-    if (!this.hass) return html``;
-
+    if (!this.hass) {
+      return html``;
+    }
     const config = this._config || {};
     const widgetType = config.widget_type || "ticker-tape";
-
     return html`
       <div class="card-config">
         <ha-textfield
-          label="Title"
+          label="Title (Optional)"
           .value=${config.title || ""}
-          @input=${(e) => this._valueChanged(e, "title")}
+          @input=${(ev) => this._valueChanged(ev, "title")}
         ></ha-textfield>
 
-        <!-- ✅ FIXED SELECT -->
         <ha-select
           label="Widget Type"
           .value=${widgetType}
-          @selected=${(e) => this._valueChanged(e, "widget_type")}
+          @change=${(ev) => this._valueChanged(ev, "widget_type")}
+          @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "widget_type"); }}
+          fixedMenuPosition
+          naturalMenuWidth
         >
-          ${Object.keys(WIDGET_CONFIGS).map(
-            (wt) => html`
-              <mwc-list-item value="${wt}">
-                ${wt.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
-              </mwc-list-item>
-            `
-          )}
+          ${Object.keys(WIDGET_CONFIGS).map(wt => html`
+            <mwc-list-item value="${wt}">
+              ${wt.replace(/-/g, " ").replace(/\b\w/g, char => char.toUpperCase())}
+            </mwc-list-item>
+          `)}
         </ha-select>
 
-        <!-- THEME -->
-        <ha-select
-          label="Color Theme"
-          .value=${config.color_theme || "dark"}
-          @selected=${(e) => this._valueChanged(e, "color_theme")}
-        >
-          <mwc-list-item value="dark">Dark</mwc-list-item>
-          <mwc-list-item value="light">Light</mwc-list-item>
-        </ha-select>
+        ${this._renderDynamicOptions(widgetType, config)}
 
-        <!-- LANGUAGE -->
-        <ha-select
-          label="Language"
-          .value=${config.locale || "en"}
-          @selected=${(e) => this._valueChanged(e, "locale")}
-        >
-          <mwc-list-item value="en">English</mwc-list-item>
-          <mwc-list-item value="de">Deutsch</mwc-list-item>
-          <mwc-list-item value="fr">Français</mwc-list-item>
-        </ha-select>
+        <div class="grid">
+            <ha-select
+              label="Color Theme"
+              .value=${config.color_theme || "dark"}
+              @change=${(ev) => this._valueChanged(ev, "color_theme")}
+              @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "color_theme"); }}
+              fixedMenuPosition
+            >
+              <mwc-list-item value="dark">Dark</mwc-list-item>
+              <mwc-list-item value="light">Light</mwc-list-item>
+            </ha-select>
+            <ha-select
+              label="Language"
+              .value=${config.locale || "en"}
+              @change=${(ev) => this._valueChanged(ev, "locale")}
+              @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "locale"); }}
+              fixedMenuWidth
+              fixedMenuPosition
+            >
+              <mwc-list-item value="en">English</mwc-list-item><mwc-list-item value="tr">Türkçe</mwc-list-item><mwc-list-item value="de">Deutsch</mwc-list-item><mwc-list-item value="fr">Français</mwc-list-item><mwc-list-item value="in">English (India)</mwc-list-item><mwc-list-item value="ca_ES">Català</mwc-list-item><mwc-list-item value="es">Español</mwc-list-item><mwc-list-item value="it">Italiano</mwc-list-item><mwc-list-item value="pl">Polski</mwc-list-item><mwc-list-item value="hu_HU">Magyar</mwc-list-item><mwc-list-item value="sv_SE">Svenska</mwc-list-item><mwc-list-item value="ru">Русский</mwc-list-item><mwc-list-item value="br">Português</mwc-list-item><mwc-list-item value="id">Bahasa Indonesia</mwc-list-item><mwc-list-item value="ms_MY">Bahasa Melayu</mwc-list-item><mwc-list-item value="th_TH">ภาษาไทย</mwc-list-item><mwc-list-item value="vi_VN">Tiếng Việt</mwc-list-item><mwc-list-item value="ja">日本語</mwc-list-item><mwc-list-item value="kr">한국어</mwc-list-item><mwc-list-item value="zh_CN">简体中文</mwc-list-item><mwc-list-item value="zh_TW">繁體中文</mwc-list-item><mwc-list-item value="ar_AE">العربية</mwc-list-item><mwc-list-item value="he_IL">עברית</mwc-list-item>
+            </ha-select>
+        </div>
 
-        <ha-textfield
-          label="Height"
-          .value=${config.height || ""}
-          @input=${(e) => this._valueChanged(e, "height")}
-        ></ha-textfield>
+        <div class="grid">
+            <ha-textfield
+              label="Height (e.g. 50px, 100%)"
+              .value=${config.height || ""}
+              @input=${(ev) => this._valueChanged(ev, "height")}
+              placeholder="Default (widget specific)"
+            ></ha-textfield>
+            <ha-textfield
+              label="Width (e.g. 500px, 100%)"
+              .value=${config.width || ""}
+              @input=${(ev) => this._valueChanged(ev, "width")}
+              placeholder="Default (100%)"
+            ></ha-textfield>
+        </div>
 
-        <ha-textfield
-          label="Width"
-          .value=${config.width || ""}
-          @input=${(e) => this._valueChanged(e, "width")}
-        ></ha-textfield>
-
-        <ha-formfield label="Transparent">
-          <ha-switch
-            .checked=${config.is_transparent || false}
-            @change=${(e) => this._valueChanged(e, "is_transparent")}
-          ></ha-switch>
-        </ha-formfield>
+        ${widgetType !== "forex-cross-rates" ? html`
+            <div class="inline-switch">
+                <ha-formfield .label=${"Transparent Background"}>
+                  <ha-switch
+                    .checked=${config.is_transparent || false}
+                    @change=${(ev) => this._valueChanged(ev, "is_transparent")}
+                  ></ha-switch>
+                </ha-formfield>
+              ${["ticker-tape", "tickers", "market-quotes"].includes(config.widget_type) ? html`
+                <ha-formfield .label=${"Show Symbol Logo"}>
+                  <ha-switch
+                    .checked=${config.show_symbol_logo !== false}
+                    @change=${(ev) => this._valueChanged(ev, "show_symbol_logo")}
+                  ></ha-switch>
+                </ha-formfield>
+              ` : ""}
+            </div>
+        ` : ""}
       </div>
     `;
   }
+  
+  _renderDynamicOptions(widgetType, config) {
+    if (!widgetType) {
+      return html``;
+    }
+    
+    const renderTextField = (label, helperText, val, configVal) => html`
+      <ha-textfield
+        label=${label}
+        .value=${val}
+        helper=${helperText}
+        @input=${(ev) => this._valueChanged(ev, configVal)}
+      ></ha-textfield>`;
+      
+    const renderSwitch = (label, checked, configVal) => html`
+      <ha-formfield .label=${label}>
+        <ha-switch
+          .checked=${checked}
+          @change=${(ev) => this._valueChanged(ev, configVal)}
+        ></ha-switch>
+      </ha-formfield>`;
 
+    if (widgetType === "market-overview" || widgetType === "market-quotes") {
+      return html`
+            <div class="textarea-container">
+                <label>Tabs & Symbols Configuration</label>
+                <textarea
+                    class="native-textarea"
+                    .value=${config.tab_config || ""}
+                    @input=${(ev) => this._valueChanged(ev, "tab_config")}
+                    rows="10"
+                ></textarea>
+                <div class="helper-text">Format: "TabName:" new line "- Symbol"</div>
+            </div>
+            
+            ${widgetType === "market-overview" ? html`
+            <div class="grid">
+                <ha-select label="Date Range" .value=${config.date_range || "12M"} @change=${(ev) => this._valueChanged(ev, "date_range")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "date_range"); }} fixedMenuPosition>
+                    <mwc-list-item value="1D">1 Day</mwc-list-item>
+                    <mwc-list-item value="1M">1 Month</mwc-list-item>
+                    <mwc-list-item value="3M">3 Months</mwc-list-item>
+                    <mwc-list-item value="12M">1 Year</mwc-list-item>
+                    <mwc-list-item value="60M">5 Years</mwc-list-item>
+                    <mwc-list-item value="ALL">All</mwc-list-item>
+                </ha-select>
+            </div>
+
+            <div class="switch-container">
+                ${renderSwitch("Show Chart", config.show_chart !== false, "show_chart")}
+                ${renderSwitch("Floating Tooltip", config.show_floating_tooltip !== false, "show_floating_tooltip")}
+            </div>
+            ` : ""}
+        `;
+    }
+    if (widgetType === "stock-market-hotlists") {
+      return html`
+        <ha-select label="Exchange" .value=${config.exchange || "US Exchanges"} @change=${(ev) => this._valueChanged(ev, "exchange")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "exchange"); }} fixedMenuPosition>
+            ${HOTLIST_EXCHANGES.map(ex => html`<mwc-list-item value="${ex.v}">${ex.l}</mwc-list-item>`)}
+        </ha-select>
+        
+        <div class="grid">
+            <ha-select label="Date Range" .value=${config.date_range || "12M"} @change=${(ev) => this._valueChanged(ev, "date_range")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "date_range"); }} fixedMenuPosition>
+                <mwc-list-item value="1D">1 Day</mwc-list-item>
+                <mwc-list-item value="1M">1 Month</mwc-list-item>
+                <mwc-list-item value="3M">3 Months</mwc-list-item>
+                <mwc-list-item value="12M">1 Year</mwc-list-item>
+                <mwc-list-item value="60M">5 Years</mwc-list-item>
+                <mwc-list-item value="ALL">All</mwc-list-item>
+            </ha-select>
+        </div>
+
+        <div class="switch-container">
+            ${renderSwitch("Show Chart", config.show_chart !== false, "show_chart")}
+            ${renderSwitch("Floating Tooltip", config.show_floating_tooltip !== false, "show_floating_tooltip")}
+        </div>
+      `;
+    }
+    
+    const ETF_SOURCES = [
+      { id: "AllAUEtf", label: "Australia" }, { id: "AllCAEtf", label: "Canada" }, { id: "AllFREtf", label: "France" },
+      { id: "AllDEEtf", label: "Germany" }, { id: "AllHKEtf", label: "Hong Kong, China" }, { id: "AllINEtf", label: "India" },
+      { id: "AllILEtf", label: "Israel" }, { id: "AllITEtf", label: "Italy" }, { id: "AllJPEtf", label: "Japan" },
+      { id: "AllLUEtf", label: "Luxembourg" }, { id: "AllMYEtf", label: "Malaysia" }, { id: "AllNLEtf", label: "Netherlands" },
+      { id: "AllNZEtf", label: "New Zealand" }, { id: "AllROEtf", label: "Romania" }, { id: "AllSGPEtf", label: "Singapore" },
+      { id: "AllESEtf", label: "Spain" }, { id: "AllCHEEtf", label: "Switzerland" }, { id: "AllTWEtf", label: "Taiwan, China" },
+      { id: "AllTHEtf", label: "Thailand" }, { id: "AllTREtf", label: "Turkey" }, { id: "AllAREEtf", label: "UAE" },
+      { id: "AllUKEtf", label: "UK" }, { id: "AllUSEtf", label: "USA" }, { id: "AllVNEtf", label: "Vietnam" }
+    ];
+    
+    switch (widgetType) {
+      case "ticker-tape":
+      case "tickers":
+        return html`
+          ${renderTextField("Symbols (comma-separated)", "e.g: BINANCE:BTCUSDT,BIST:XU100", (config.pairs || []).join(","), "pairs")}
+          ${widgetType === "ticker-tape" ? html`
+            <ha-select label="Display Mode" .value=${config.display_mode || "regular"} @change=${(ev) => this._valueChanged(ev, "display_mode")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "display_mode"); }} fixedMenuPosition>
+              <mwc-list-item value="regular">Regular</mwc-list-item>
+              <mwc-list-item value="adaptive">Adaptive</mwc-list-item>
+              <mwc-list-item value="compact">Compact</mwc-list-item>
+            </ha-select>
+          ` : ""}
+        `;
+      case "single-quote":
+      case "technical-analysis":
+        const taOptions = widgetType === "technical-analysis" ? html`
+          <div class="grid">
+            <ha-select label="Time Interval" .value=${config.interval || "1D"} @change=${(ev) => this._valueChanged(ev, "interval")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "interval"); }} fixedMenuPosition>
+              ${["1m", "5m", "15m", "1H", "4H", "1D", "1W", "1M"].map(interval => html`<mwc-list-item value="${interval}">${interval}</mwc-list-item>`)}
+            </ha-select>
+            ${renderSwitch("Show Interval Tabs", config.show_interval_tabs !== false, "show_interval_tabs")}
+          </div>
+          <ha-select label="Display Mode" .value=${config.display_mode || "single"} @change=${(ev) => this._valueChanged(ev, "display_mode")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "display_mode"); }} fixedMenuPosition>
+            <mwc-list-item value="single">Single</mwc-list-item>
+            <mwc-list-item value="multiple">Multiple</mwc-list-item>
+          </ha-select>
+        ` : "";
+        return html`${renderTextField("Symbol", "Just one symbol. e.g: NASDAQ:AAPL", (config.pairs || [""])[0], "pairs")}${taOptions}`;
+      case "stock-heatmap":
+      case "etf-heatmap":
+        const isStockHeatmap = widgetType === "stock-heatmap";
+        const SIZES = isStockHeatmap ? [
+          { v: "market_cap_basic", n: "Market cap" }, { v: "volume", n: "Volume 1D" }, { v: "volume|1W", n: "Volume 1W" },
+          { v: "volume|1M", n: "Volume 1M" }, { v: "Value.Traded", n: "Price * Volume (Turnover) 1D" },
+          { v: "Value.Traded|1W", n: "Price * Volume (Turnover) 1W" }, { v: "Value.Traded|1M", n: "Price * Volume (Turnover) 1M" }, { v: "monoSize", n: "Mono size" }
+        ] : [
+          { v: "volume", n: "Volume 1D" }, { v: "volume|1W", n: "Volume 1W" }, { v: "volume|1M", n: "Volume 1M" },
+          { v: "Value.Traded", n: "Price * Volume (Turnover) 1D" }, { v: "Value.Traded|1W", n: "Price * Volume (Turnover) 1W" },
+          { v: "Value.Traded|1M", n: "Price * Volume (Turnover) 1M" }, { v: "monoSize", n: "Mono size" }
+        ];
+        const ASSET_CLASSES = ["asset_class", "no_group"];
+        const HEATMAP_COLORS = [
+          { value: "change|60", label: "Change 1h, %" }, { value: "change|240", label: "Change 4h, %" }, { value: "change", label: "Change D" },
+          { value: "Perf.W", label: "Performance W" }, { value: "Perf.1M", label: "Performance M" }, { value: "Perf.3M", label: "Performance 3M, %" },
+          { value: "Perf.6M", label: "Performance 6M, %" }, { value: "Perf.Y", label: "Performance Y, %" }, { value: "Perf.YTD", label: "Year-to-Date" },
+          { value: "premarket_change", label: "Pre-market Change, %" }, { value: "postmarket_change", label: "Post-market Change, %" },
+          { value: "relative_volume_10d_calc", label: "Relative Volume" }, { value: "Volatility.D", label: "Volatility D, %" }, { value: "gap", label: "Gap, %" }
+        ];
+        const ETF_COLORS = [
+          { value: "change", label: "Change D, %" }, { value: "Perf.W", label: "Performance W, %" }, { value: "Perf.1M", label: "Performance M, %" },
+          { value: "Perf.3M", label: "Performance 3M, %" }, { value: "Perf.6M", label: "Performance 6M, %" }, { value: "Perf.YTD", label: "Performance YTD, %" },
+          { value: "Perf.Y", label: "Performance Y, %" }, { value: "nav_total_return.1M", label: "NAV total return M" }, { value: "nav_total_return.3M", label: "NAV total return 3M" },
+          { value: "nav_total_return.YTD", label: "NAV total return YTD" }, { value: "nav_total_return.1Y", label: "NAV total return Y" },
+          { value: "nav_total_return.3Y", label: "NAV total return 3Y" }, { value: "weight_top_10", label: "Top 10 weight (% in top)" },
+          { value: "weight_top_25", label: "Top 25 weight (% in top)" }, { value: "Volatility.D", label: "Volatility D, %" }, { value: "Volatility.M", label: "Volatility M, %" },
+          { value: "beta_1_year", label: "Beta 1Y" }, { value: "beta_3_year", label: "Beta 3Y" }, { value: "beta_5_year", label: "Beta 5Y" }
+        ];
+        return html`
+          ${isStockHeatmap ? renderTextField("Data Source", "e.g: SPX500", config.data_source || "", "data_source") : html`<ha-select label="Data Source" .value=${config.data_source || ""} @change=${(ev) => this._valueChanged(ev, "data_source")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "data_source"); }} fixedMenuPosition>${ETF_SOURCES.map(src => html`<mwc-list-item value="${src.id}">${src.label}</mwc-list-item>`)}</ha-select>`}
+          ${isStockHeatmap ? renderTextField("Exchange (Optional)", "e.g: NASDAQ", config.exchange || "", "exchange") : ""}
+          <div class="grid">
+            <ha-select label="Grouping" .value=${config.grouping || (isStockHeatmap ? "sector" : "asset_class")} @change=${(ev) => this._valueChanged(ev, "grouping")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "grouping"); }} fixedMenuPosition}>
+              ${(isStockHeatmap ? ["sector", "no_group"] : ASSET_CLASSES).map(group => html`<mwc-list-item value="${group}">${group.split("_").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}</mwc-list-item>`)}
+            </ha-select>
+            <ha-select label="Block Color" .value=${config.block_color || "change"} @change=${(ev) => this._valueChanged(ev, "block_color")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "block_color"); }} fixedMenuPosition}>
+              ${isStockHeatmap ? HEATMAP_COLORS.map(color => html`<mwc-list-item value="${color.value}">${color.label}</mwc-list-item>`) : ETF_COLORS.map(color => html`<mwc-list-item value="${color.value}">${color.label}</mwc-list-item>`)}
+            </ha-select>
+          </div>
+          <ha-select label="Block Size" .value=${config.block_size || (isStockHeatmap ? "market_cap_basic" : "volume")} @change=${(ev) => this._valueChanged(ev, "block_size")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "block_size"); }} fixedMenuPosition}>
+            ${SIZES.map(sz => html`<mwc-list-item value="${sz.v}">${sz.n}</mwc-list-item>`)}
+          </ha-select>
+          
+          <div class="switch-container">
+            ${renderSwitch("Show Top Bar", config.has_top_bar || false, "has_top_bar")}
+            ${renderSwitch("Zoom Enabled", config.is_zoom_enabled !== false, "is_zoom_enabled")}
+            ${renderSwitch("Has Symbol Tooltip", config.has_symbol_tooltip !== false, "has_symbol_tooltip")}
+            ${renderSwitch("Data Set Enabled", config.is_data_set_enabled || false, "is_data_set_enabled")}
+            ${renderSwitch("Mono Size", config.is_mono_size || false, "is_mono_size")}
+          </div>
+        `;
+      case "forex-heat-map":
+      case "forex-cross-rates":
+        const selectedCurrencies = config.currencies || [];
+        const availableCurrencies = FOREX_CURRENCIES.filter(c => !selectedCurrencies.includes(c));
+        return html`
+          <div class="currency-selector">
+            <label id="currency-label">Currencies</label>
+            <div class="tags-container" aria-labelledby="currency-label">
+              ${selectedCurrencies.map(cur => html`
+                <span class="tag">
+                  ${cur}
+                  <button class="remove-btn" .currency=${cur} @click=${this._removeCurrency} title="Remove ${cur}">x</button>
+                </span>
+              `)}
+            </div>
+            <ha-select
+                label="Add Currency"
+                @change=${this._addCurrency}
+                @closed=${(ev) => { ev.stopPropagation(); this._addCurrency(ev); }}
+                fixedMenuPosition
+            >
+              ${availableCurrencies.map(cur => html`
+                <mwc-list-item value="${cur}">${cur}</mwc-list-item>
+              `)}
+            </ha-select>
+          </div>
+          ${renderTextField("Background Color (Hex)", "e.g: #0F0F0F", config.background_color || "", "background_color")}
+        `;
+      case "economic-calendar":
+        const selectedCountries = config.country_filter ? config.country_filter.split(",") : [];
+        const selectedCountryObjs = selectedCountries.map(c => COUNTRIES_FOR_ECONOMIC_CALENDAR.find(co => co.code === c)).filter(Boolean);
+        const availableCountries = COUNTRIES_FOR_ECONOMIC_CALENDAR.filter(co => {
+          if (co.code.includes(",")) {
+            const subCountries = co.code.split(",");
+            return !subCountries.every(sc => selectedCountries.includes(sc));
+          }
+          return !selectedCountries.includes(co.code);
+        });
+        return html`
+          <div class="country-selector">
+              <label id="country-label">Country Filter</label>
+              <div class="tags-container" aria-labelledby="country-label">
+                  ${selectedCountryObjs.map(co => html`
+                      <span class="tag">
+                          ${co.name}
+                          <button class="remove-btn" .country=${co.code} @click=${this._removeCountry} title="Remove ${co.name}">x</button>
+                      </span>
+                  `)}
+              </div>
+              <ha-select
+                  label="Add Country"
+                  @change=${this._addCountry}
+                  @closed=${(ev) => { ev.stopPropagation(); this._addCountry(ev); }}
+                  fixedMenuPosition
+              >
+                  ${availableCountries.map(co => html`
+                      <mwc-list-item value="${co.code}">${co.name}</mwc-list-item>
+                  `)}
+              </ha-select>
+          </div>
+          <ha-select
+              label="Importance Filter"
+              .value=${config.importance_filter || "-1,0,1"}
+              @change=${(ev) => this._valueChanged(ev, "importance_filter")}
+              @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "importance_filter"); }}
+              fixedMenuPosition
+          >
+              <mwc-list-item value="-1,0,1">All (No Filter)</mwc-list-item>
+              <mwc-list-item value="1">Low</mwc-list-item>
+              <mwc-list-item value="0">Medium</mwc-list-item>
+              <mwc-list-item value="-1">High</mwc-list-item>
+              <mwc-list-item value="-1,0">High & Medium</mwc-list-item>
+              <mwc-list-item value="0,1">Medium & Low</mwc-list-item>
+          </ha-select>
+        `;
+      case "news":
+        const MARKETS = [
+          { id: "crypto", label: "Cryptocurrencies" }, { id: "forex", label: "Currencies" }, { id: "stock", label: "Stocks" },
+          { id: "index", label: "Indices" }, { id: "futures", label: "Futures" }, { id: "cfd", label: "Bonds" }
+        ];
+        return html`
+          <ha-select label="Display Mode" .value=${config.display_mode || "adaptive"} @change=${(ev) => this._valueChanged(ev, "display_mode")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "display_mode"); }} fixedMenuPosition>
+            <mwc-list-item value="adaptive">Adaptive</mwc-list-item>
+            <mwc-list-item value="regular">Regular</mwc-list-item>
+            <mwc-list-item value="compact">Compact</mwc-list-item>
+          </ha-select>
+          <ha-select label="Feed Mode" .value=${config.feed_mode || "all_symbols"} @change=${(ev) => this._valueChanged(ev, "feed_mode")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "feed_mode"); }} fixedMenuPosition>
+            <mwc-list-item value="all_symbols">All Symbols</mwc-list-item>
+            <mwc-list-item value="symbol">Symbol</mwc-list-item>
+            <mwc-list-item value="market">Market</mwc-list-item>
+          </ha-select>
+          ${config.feed_mode === "symbol" ? html`
+            <ha-textfield
+              label="Symbol"
+              .value=${config.symbol || ""}
+              @input=${(ev) => this._valueChanged(ev, "symbol")}
+            ></ha-textfield>
+          ` : ""}
+          ${config.feed_mode === "market" ? html`
+            <ha-select
+              label="Market Type"
+              .value=${config.market || "crypto"}
+              @change=${(ev) => this._valueChanged(ev, "market")}
+              @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "market"); }}
+              fixedMenuPosition
+            >
+              ${MARKETS.map(m => html`<mwc-list-item value="${m.id}">${m.label}</mwc-list-item>`)}
+            </ha-select>
+          ` : ""}
+        `;
+      default:
+        return html``;
+    }
+  }
   static get styles() {
     return css`
-      .card-config {
+      .card-config { display: flex; flex-direction: column; gap: 16px; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+      .inline-switch { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 16px; }
+      .switch-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; align-items: start; }
+      .switch-container ha-formfield { padding-top: 0; }
+      .textarea-container { display: flex; flex-direction: column; gap: 4px; }
+      .native-textarea {
+        width: 100%;
+        min-height: 150px;
+        padding: 8px;
+        border: 1px solid var(--divider-color);
+        background: var(--card-background-color);
+        color: var(--primary-text-color);
+        border-radius: 4px;
+        font-family: monospace;
+        box-sizing: border-box;
+      }
+      .native-textarea:focus {
+        border-color: var(--primary-color);
+        outline: none;
+      }
+      .helper-text { font-size: 11px; color: var(--secondary-text-color); margin-bottom: 4px; }
+      ha-select, ha-textfield, ha-textarea { width: 100%; }
+      ha-formfield { display: flex; align-items: center; justify-content: space-between; }
+      .currency-selector, .country-selector { display: flex; flex-direction: column; gap: 8px; }
+      .currency-selector > label, .country-selector > label {
+        font-family: var(--paper-font-body1_-_font-family);
+        -webkit-font-smoothing: var(--paper-font-body1_-_-webkit-font-smoothing);
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--input-label-ink-color, var(--primary-text-color));
+        padding: 0;
+      }
+      .tags-container {
         display: flex;
-        flex-direction: column;
-        gap: 16px;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 4px 0;
+        min-height: 24px;
+      }
+      .tag {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        background-color: #005912;
+        color: var(--text-primary-color);
+        border-radius: 12px;
+        padding: 2px 10px;
+        font-weight: 500;
+        margin: 2px;
+      }
+      .tag .remove-btn {
+        position: absolute;
+        top: -3px;
+        right: -3px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background-color: white;
+        color: black;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: bold;
+        padding: 0;
+        line-height: 1;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        transition: background-color 0.2s ease;
+        z-index: 1;
+      }
+      .tag .remove-btn:hover {
+        background-color: var(--error-color-dark, #d32f2f);
       }
     `;
   }
 }
-
-customElements.define(
-  "tradingview-widget-card-editor",
-  TradingViewWidgetCardEditor
-);
+customElements.define("tradingview-widget-card-editor", TradingViewWidgetCardEditor);
+window.customCards = window.customCards || [];
+window.customCards.push({
+  type: "tradingview-widget-card",
+  name: "TradingView Widget Card",
+  preview: true,
+  description: "A versatile card that displays various financial widgets from TradingView."
+});
