@@ -254,6 +254,7 @@ const WIDGET_DEFAULTS_TEMP = {
   }
 };
 
+
 // --- MAIN CARD COMPONENT ---
 
 class TradingViewWidgetCard extends HTMLElement {
@@ -575,10 +576,6 @@ class TradingViewWidgetCardEditor extends LitElement {
       }
     };
   }
-  
-  _stopEvent(ev) {
-    ev.stopPropagation();
-  }
 
   setConfig(config) {
     this._config = config;
@@ -665,10 +662,11 @@ class TradingViewWidgetCardEditor extends LitElement {
   }
   
   _addCurrency(event) {
-    if (!event.target.value) {
+    const target = event.currentTarget || event.target;
+    if (!target.value) {
       return;
     }
-    const currency = event.target.value;
+    const currency = target.value;
     const currentCurrencies = this._config.currencies || [];
     if (!currentCurrencies.includes(currency)) {
       const newConfig = {
@@ -678,7 +676,7 @@ class TradingViewWidgetCardEditor extends LitElement {
       this._config = newConfig;
       this._dispatchConfigChanged(newConfig);
     }
-    event.target.value = null;
+    target.value = "";
   }
   
   _removeCurrency(event) {
@@ -693,10 +691,11 @@ class TradingViewWidgetCardEditor extends LitElement {
   }
   
   _addCountry(event) {
-    if (event.target.value === null || event.target.value === undefined) {
+    const target = event.currentTarget || event.target;
+    if (!target.value) {
       return;
     }
-    const countryStr = event.target.value;
+    const countryStr = target.value;
     let currentCountries = this._config.country_filter ? this._config.country_filter.split(",") : [];
     let newCountries = [...currentCountries];
     if (countryStr.includes(",")) {
@@ -716,7 +715,7 @@ class TradingViewWidgetCardEditor extends LitElement {
     };
     this._config = newConfig;
     this._dispatchConfigChanged(newConfig);
-    event.target.value = null;
+    target.value = "";
   }
   
   _removeCountry(event) {
@@ -748,13 +747,13 @@ class TradingViewWidgetCardEditor extends LitElement {
         <ha-select
           label="Widget Type"
           .value=${widgetType}
-          @selected=${(ev) => this._valueChanged(ev, "widget_type")}
-          @closed=${this._stopEvent}
+          @change=${(ev) => this._valueChanged(ev, "widget_type")}
+          @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "widget_type"); }}
           fixedMenuPosition
           naturalMenuWidth
         >
           ${Object.keys(WIDGET_CONFIGS).map(wt => html`
-            <mwc-list-item .value=${wt}>
+            <mwc-list-item value="${wt}">
               ${wt.replace(/-/g, " ").replace(/\b\w/g, char => char.toUpperCase())}
             </mwc-list-item>
           `)}
@@ -766,8 +765,8 @@ class TradingViewWidgetCardEditor extends LitElement {
             <ha-select
               label="Color Theme"
               .value=${config.color_theme || "dark"}
-              @selected=${(ev) => this._valueChanged(ev, "color_theme")}
-              @closed=${this._stopEvent}
+              @change=${(ev) => this._valueChanged(ev, "color_theme")}
+              @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "color_theme"); }}
               fixedMenuPosition
             >
               <mwc-list-item value="dark">Dark</mwc-list-item>
@@ -776,8 +775,8 @@ class TradingViewWidgetCardEditor extends LitElement {
             <ha-select
               label="Language"
               .value=${config.locale || "en"}
-              @selected=${(ev) => this._valueChanged(ev, "locale")}
-              @closed=${this._stopEvent}
+              @change=${(ev) => this._valueChanged(ev, "locale")}
+              @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "locale"); }}
               fixedMenuWidth
               fixedMenuPosition
             >
@@ -858,7 +857,7 @@ class TradingViewWidgetCardEditor extends LitElement {
             
             ${widgetType === "market-overview" ? html`
             <div class="grid">
-                <ha-select label="Date Range" .value=${config.date_range || "12M"} @selected=${(ev) => this._valueChanged(ev, "date_range")} @closed=${this._stopEvent} fixedMenuPosition>
+                <ha-select label="Date Range" .value=${config.date_range || "12M"} @change=${(ev) => this._valueChanged(ev, "date_range")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "date_range"); }} fixedMenuPosition>
                     <mwc-list-item value="1D">1 Day</mwc-list-item>
                     <mwc-list-item value="1M">1 Month</mwc-list-item>
                     <mwc-list-item value="3M">3 Months</mwc-list-item>
@@ -877,12 +876,12 @@ class TradingViewWidgetCardEditor extends LitElement {
     }
     if (widgetType === "stock-market-hotlists") {
       return html`
-        <ha-select label="Exchange" .value=${config.exchange || "US Exchanges"} @selected=${(ev) => this._valueChanged(ev, "exchange")} @closed=${this._stopEvent} fixedMenuPosition>
+        <ha-select label="Exchange" .value=${config.exchange || "US Exchanges"} @change=${(ev) => this._valueChanged(ev, "exchange")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "exchange"); }} fixedMenuPosition>
             ${HOTLIST_EXCHANGES.map(ex => html`<mwc-list-item value="${ex.v}">${ex.l}</mwc-list-item>`)}
         </ha-select>
         
         <div class="grid">
-            <ha-select label="Date Range" .value=${config.date_range || "12M"} @selected=${(ev) => this._valueChanged(ev, "date_range")} @closed=${this._stopEvent} fixedMenuPosition>
+            <ha-select label="Date Range" .value=${config.date_range || "12M"} @change=${(ev) => this._valueChanged(ev, "date_range")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "date_range"); }} fixedMenuPosition>
                 <mwc-list-item value="1D">1 Day</mwc-list-item>
                 <mwc-list-item value="1M">1 Month</mwc-list-item>
                 <mwc-list-item value="3M">3 Months</mwc-list-item>
@@ -916,7 +915,7 @@ class TradingViewWidgetCardEditor extends LitElement {
         return html`
           ${renderTextField("Symbols (comma-separated)", "e.g: BINANCE:BTCUSDT,BIST:XU100", (config.pairs || []).join(","), "pairs")}
           ${widgetType === "ticker-tape" ? html`
-            <ha-select label="Display Mode" .value=${config.display_mode || "regular"} @selected=${(ev) => this._valueChanged(ev, "display_mode")} @closed=${this._stopEvent} fixedMenuPosition>
+            <ha-select label="Display Mode" .value=${config.display_mode || "regular"} @change=${(ev) => this._valueChanged(ev, "display_mode")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "display_mode"); }} fixedMenuPosition>
               <mwc-list-item value="regular">Regular</mwc-list-item>
               <mwc-list-item value="adaptive">Adaptive</mwc-list-item>
               <mwc-list-item value="compact">Compact</mwc-list-item>
@@ -927,12 +926,12 @@ class TradingViewWidgetCardEditor extends LitElement {
       case "technical-analysis":
         const taOptions = widgetType === "technical-analysis" ? html`
           <div class="grid">
-            <ha-select label="Time Interval" .value=${config.interval || "1D"} @selected=${(ev) => this._valueChanged(ev, "interval")} @closed=${this._stopEvent} fixedMenuPosition>
-              ${["1m", "5m", "15m", "1H", "4H", "1D", "1W", "1M"].map(interval => html`<mwc-list-item .value=${interval}>${interval}</mwc-list-item>`)}
+            <ha-select label="Time Interval" .value=${config.interval || "1D"} @change=${(ev) => this._valueChanged(ev, "interval")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "interval"); }} fixedMenuPosition>
+              ${["1m", "5m", "15m", "1H", "4H", "1D", "1W", "1M"].map(interval => html`<mwc-list-item value="${interval}">${interval}</mwc-list-item>`)}
             </ha-select>
             ${renderSwitch("Show Interval Tabs", config.show_interval_tabs !== false, "show_interval_tabs")}
           </div>
-          <ha-select label="Display Mode" .value=${config.display_mode || "single"} @selected=${(ev) => this._valueChanged(ev, "display_mode")} @closed=${this._stopEvent} fixedMenuPosition>
+          <ha-select label="Display Mode" .value=${config.display_mode || "single"} @change=${(ev) => this._valueChanged(ev, "display_mode")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "display_mode"); }} fixedMenuPosition>
             <mwc-list-item value="single">Single</mwc-list-item>
             <mwc-list-item value="multiple">Multiple</mwc-list-item>
           </ha-select>
@@ -968,18 +967,18 @@ class TradingViewWidgetCardEditor extends LitElement {
           { value: "beta_1_year", label: "Beta 1Y" }, { value: "beta_3_year", label: "Beta 3Y" }, { value: "beta_5_year", label: "Beta 5Y" }
         ];
         return html`
-          ${isStockHeatmap ? renderTextField("Data Source", "e.g: SPX500", config.data_source || "", "data_source") : html`<ha-select label="Data Source" .value=${config.data_source || ""} @selected=${(ev) => this._valueChanged(ev, "data_source")} @closed=${this._stopEvent} fixedMenuPosition>${ETF_SOURCES.map(src => html`<mwc-list-item value="${src.id}">${src.label}</mwc-list-item>`)}</ha-select>`}
+          ${isStockHeatmap ? renderTextField("Data Source", "e.g: SPX500", config.data_source || "", "data_source") : html`<ha-select label="Data Source" .value=${config.data_source || ""} @change=${(ev) => this._valueChanged(ev, "data_source")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "data_source"); }} fixedMenuPosition>${ETF_SOURCES.map(src => html`<mwc-list-item value="${src.id}">${src.label}</mwc-list-item>`)}</ha-select>`}
           ${isStockHeatmap ? renderTextField("Exchange (Optional)", "e.g: NASDAQ", config.exchange || "", "exchange") : ""}
           <div class="grid">
-            <ha-select label="Grouping" .value=${config.grouping || (isStockHeatmap ? "sector" : "asset_class")} @selected=${(ev) => this._valueChanged(ev, "grouping")} @closed=${this._stopEvent} fixedMenuPosition}>
-              ${(isStockHeatmap ? ["sector", "no_group"] : ASSET_CLASSES).map(group => html`<mwc-list-item .value=${group}>${group.split("_").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}</mwc-list-item>`)}
+            <ha-select label="Grouping" .value=${config.grouping || (isStockHeatmap ? "sector" : "asset_class")} @change=${(ev) => this._valueChanged(ev, "grouping")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "grouping"); }} fixedMenuPosition}>
+              ${(isStockHeatmap ? ["sector", "no_group"] : ASSET_CLASSES).map(group => html`<mwc-list-item value="${group}">${group.split("_").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}</mwc-list-item>`)}
             </ha-select>
-            <ha-select label="Block Color" .value=${config.block_color || "change"} @selected=${(ev) => this._valueChanged(ev, "block_color")} @closed=${this._stopEvent} fixedMenuPosition}>
+            <ha-select label="Block Color" .value=${config.block_color || "change"} @change=${(ev) => this._valueChanged(ev, "block_color")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "block_color"); }} fixedMenuPosition}>
               ${isStockHeatmap ? HEATMAP_COLORS.map(color => html`<mwc-list-item value="${color.value}">${color.label}</mwc-list-item>`) : ETF_COLORS.map(color => html`<mwc-list-item value="${color.value}">${color.label}</mwc-list-item>`)}
             </ha-select>
           </div>
-          <ha-select label="Block Size" .value=${config.block_size || (isStockHeatmap ? "market_cap_basic" : "volume")} @selected=${(ev) => this._valueChanged(ev, "block_size")} @closed=${this._stopEvent} fixedMenuPosition}>
-            ${SIZES.map(sz => html`<mwc-list-item .value=${sz.v}>${sz.n}</mwc-list-item>`)}
+          <ha-select label="Block Size" .value=${config.block_size || (isStockHeatmap ? "market_cap_basic" : "volume")} @change=${(ev) => this._valueChanged(ev, "block_size")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "block_size"); }} fixedMenuPosition}>
+            ${SIZES.map(sz => html`<mwc-list-item value="${sz.v}">${sz.n}</mwc-list-item>`)}
           </ha-select>
           
           <div class="switch-container">
@@ -1007,12 +1006,12 @@ class TradingViewWidgetCardEditor extends LitElement {
             </div>
             <ha-select
                 label="Add Currency"
-                @selected=${this._addCurrency}
-                @closed=${this._stopEvent}
+                @change=${this._addCurrency}
+                @closed=${(ev) => { ev.stopPropagation(); this._addCurrency(ev); }}
                 fixedMenuPosition
             >
               ${availableCurrencies.map(cur => html`
-                <mwc-list-item .value=${cur}>${cur}</mwc-list-item>
+                <mwc-list-item value="${cur}">${cur}</mwc-list-item>
               `)}
             </ha-select>
           </div>
@@ -1041,20 +1040,20 @@ class TradingViewWidgetCardEditor extends LitElement {
               </div>
               <ha-select
                   label="Add Country"
-                  @selected=${this._addCountry}
-                  @closed=${this._stopEvent}
+                  @change=${this._addCountry}
+                  @closed=${(ev) => { ev.stopPropagation(); this._addCountry(ev); }}
                   fixedMenuPosition
               >
                   ${availableCountries.map(co => html`
-                      <mwc-list-item .value=${co.code}>${co.name}</mwc-list-item>
+                      <mwc-list-item value="${co.code}">${co.name}</mwc-list-item>
                   `)}
               </ha-select>
           </div>
           <ha-select
               label="Importance Filter"
               .value=${config.importance_filter || "-1,0,1"}
-              @selected=${(ev) => this._valueChanged(ev, "importance_filter")}
-              @closed=${this._stopEvent}
+              @change=${(ev) => this._valueChanged(ev, "importance_filter")}
+              @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "importance_filter"); }}
               fixedMenuPosition
           >
               <mwc-list-item value="-1,0,1">All (No Filter)</mwc-list-item>
@@ -1071,12 +1070,12 @@ class TradingViewWidgetCardEditor extends LitElement {
           { id: "index", label: "Indices" }, { id: "futures", label: "Futures" }, { id: "cfd", label: "Bonds" }
         ];
         return html`
-          <ha-select label="Display Mode" .value=${config.display_mode || "adaptive"} @selected=${(ev) => this._valueChanged(ev, "display_mode")} @closed=${this._stopEvent} fixedMenuPosition>
+          <ha-select label="Display Mode" .value=${config.display_mode || "adaptive"} @change=${(ev) => this._valueChanged(ev, "display_mode")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "display_mode"); }} fixedMenuPosition>
             <mwc-list-item value="adaptive">Adaptive</mwc-list-item>
             <mwc-list-item value="regular">Regular</mwc-list-item>
             <mwc-list-item value="compact">Compact</mwc-list-item>
           </ha-select>
-          <ha-select label="Feed Mode" .value=${config.feed_mode || "all_symbols"} @selected=${(ev) => this._valueChanged(ev, "feed_mode")} @closed=${this._stopEvent} fixedMenuPosition>
+          <ha-select label="Feed Mode" .value=${config.feed_mode || "all_symbols"} @change=${(ev) => this._valueChanged(ev, "feed_mode")} @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "feed_mode"); }} fixedMenuPosition>
             <mwc-list-item value="all_symbols">All Symbols</mwc-list-item>
             <mwc-list-item value="symbol">Symbol</mwc-list-item>
             <mwc-list-item value="market">Market</mwc-list-item>
@@ -1092,11 +1091,11 @@ class TradingViewWidgetCardEditor extends LitElement {
             <ha-select
               label="Market Type"
               .value=${config.market || "crypto"}
-              @selected=${(ev) => this._valueChanged(ev, "market")}
-              @closed=${this._stopEvent}
+              @change=${(ev) => this._valueChanged(ev, "market")}
+              @closed=${(ev) => { ev.stopPropagation(); this._valueChanged(ev, "market"); }}
               fixedMenuPosition
             >
-              ${MARKETS.map(m => html`<mwc-list-item value=${m.id}>${m.label}</mwc-list-item>`)}
+              ${MARKETS.map(m => html`<mwc-list-item value="${m.id}">${m.label}</mwc-list-item>`)}
             </ha-select>
           ` : ""}
         `;
