@@ -254,15 +254,12 @@ const WIDGET_DEFAULTS_TEMP = {
   }
 };
 
-
 // --- MAIN CARD COMPONENT ---
 
 class TradingViewWidgetCard extends HTMLElement {
   constructor() {
     super();
-    this.attachShadow({
-      mode: "open"
-    });
+    this.attachShadow({ mode: "open" });
   }
   
   _showError(errorMsg) {
@@ -586,15 +583,19 @@ class TradingViewWidgetCardEditor extends LitElement {
   setConfig(config) {
     this._config = config;
   }
-  _valueChanged(event) {
-    const target = event.target;
-    const configValue = target.configValue;
+  
+  _valueChanged(event, configKey) {
+    if (!configKey) return;
+    
+    const target = event.currentTarget || event.target;
     let value = target.checked !== undefined ? target.checked : target.value;
-    if (this._config[configValue] === value) {
+    
+    if (this._config[configKey] === value) {
       return;
     }
+    
     let newConfig;
-    if (configValue === "widget_type") {
+    if (configKey === "widget_type") {
       const defaultWidgetConfig = WIDGET_DEFAULTS_TEMP[value] || {};
       const baseEditorConfig = {
         color_theme: this._config.color_theme || "dark",
@@ -613,29 +614,29 @@ class TradingViewWidgetCardEditor extends LitElement {
         ...this._config
       };
       newConfig = clonedConfig;
-      if (configValue === "pairs" || configValue === "currencies" || configValue === "country_filter") {
+      if (configKey === "pairs" || configKey === "currencies" || configKey === "country_filter") {
         if (!["market-overview", "stock-market-hotlists", "market-quotes"].includes(newConfig.widget_type)) {
-          if (["single-quote", "technical-analysis"].includes(newConfig.widget_type) && configValue === "pairs") {
+          if (["single-quote", "technical-analysis"].includes(newConfig.widget_type) && configKey === "pairs") {
             value = value.trim() ? [value.trim()] : [];
-          } else if (newConfig.widget_type === "economic-calendar" && configValue === "country_filter") {
+          } else if (newConfig.widget_type === "economic-calendar" && configKey === "country_filter") {
             value = Array.isArray(value) ? value.map(val => val.trim()).filter(Boolean).join(",") : value;
           } else {
             value = value.split(",").map(val => val.trim()).filter(Boolean);
           }
           if (Array.isArray(value) && value.length === 0) {
-            delete newConfig[configValue];
+            delete newConfig[configKey];
           } else {
-            newConfig[configValue] = value;
+            newConfig[configKey] = value;
           }
         }
       } else if (typeof value === "boolean") {
-        newConfig[configValue] = value;
+        newConfig[configKey] = value;
       } else if (value === "") {
-        delete newConfig[configValue];
+        delete newConfig[configKey];
       } else {
-        newConfig[configValue] = value;
+        newConfig[configKey] = value;
       }
-      if (configValue === "feed_mode") {
+      if (configKey === "feed_mode") {
         if (newConfig.feed_mode !== "symbol") {
           delete newConfig.symbol;
         }
@@ -650,6 +651,7 @@ class TradingViewWidgetCardEditor extends LitElement {
     this._config = newConfig;
     this._dispatchConfigChanged(newConfig);
   }
+  
   _dispatchConfigChanged(config) {
     const detailObj = {
       config: config
@@ -661,6 +663,7 @@ class TradingViewWidgetCardEditor extends LitElement {
     };
     this.dispatchEvent(new CustomEvent("config-changed", eventOptions));
   }
+  
   _addCurrency(event) {
     if (!event.target.value) {
       return;
@@ -677,6 +680,7 @@ class TradingViewWidgetCardEditor extends LitElement {
     }
     event.target.value = null;
   }
+  
   _removeCurrency(event) {
     const currencyToRemove = event.currentTarget.currency;
     const currentCurrencies = this._config.currencies || [];
@@ -687,6 +691,7 @@ class TradingViewWidgetCardEditor extends LitElement {
     this._config = newConfig;
     this._dispatchConfigChanged(newConfig);
   }
+  
   _addCountry(event) {
     if (event.target.value === null || event.target.value === undefined) {
       return;
@@ -713,6 +718,7 @@ class TradingViewWidgetCardEditor extends LitElement {
     this._dispatchConfigChanged(newConfig);
     event.target.value = null;
   }
+  
   _removeCountry(event) {
     const countryToRemove = event.currentTarget.country;
     let currentCountries = this._config.country_filter ? this._config.country_filter.split(",") : [];
@@ -724,6 +730,7 @@ class TradingViewWidgetCardEditor extends LitElement {
     this._config = newConfig;
     this._dispatchConfigChanged(newConfig);
   }
+  
   render() {
     if (!this.hass) {
       return html``;
@@ -735,15 +742,13 @@ class TradingViewWidgetCardEditor extends LitElement {
         <ha-textfield
           label="Title (Optional)"
           .value=${config.title || ""}
-          .configValue=${"title"}
-          @input=${this._valueChanged}
+          @input=${(ev) => this._valueChanged(ev, "title")}
         ></ha-textfield>
 
         <ha-select
           label="Widget Type"
           .value=${widgetType}
-          .configValue=${"widget_type"}
-          @selected=${this._valueChanged}
+          @selected=${(ev) => this._valueChanged(ev, "widget_type")}
           @closed=${this._stopEvent}
           fixedMenuPosition
           naturalMenuWidth
@@ -761,8 +766,7 @@ class TradingViewWidgetCardEditor extends LitElement {
             <ha-select
               label="Color Theme"
               .value=${config.color_theme || "dark"}
-              .configValue=${"color_theme"}
-              @selected=${this._valueChanged}
+              @selected=${(ev) => this._valueChanged(ev, "color_theme")}
               @closed=${this._stopEvent}
               fixedMenuPosition
             >
@@ -772,8 +776,7 @@ class TradingViewWidgetCardEditor extends LitElement {
             <ha-select
               label="Language"
               .value=${config.locale || "en"}
-              .configValue=${"locale"}
-              @selected=${this._valueChanged}
+              @selected=${(ev) => this._valueChanged(ev, "locale")}
               @closed=${this._stopEvent}
               fixedMenuWidth
               fixedMenuPosition
@@ -786,15 +789,13 @@ class TradingViewWidgetCardEditor extends LitElement {
             <ha-textfield
               label="Height (e.g. 50px, 100%)"
               .value=${config.height || ""}
-              .configValue=${"height"}
-              @input=${this._valueChanged}
+              @input=${(ev) => this._valueChanged(ev, "height")}
               placeholder="Default (widget specific)"
             ></ha-textfield>
             <ha-textfield
               label="Width (e.g. 500px, 100%)"
               .value=${config.width || ""}
-              .configValue=${"width"}
-              @input=${this._valueChanged}
+              @input=${(ev) => this._valueChanged(ev, "width")}
               placeholder="Default (100%)"
             ></ha-textfield>
         </div>
@@ -804,16 +805,14 @@ class TradingViewWidgetCardEditor extends LitElement {
                 <ha-formfield .label=${"Transparent Background"}>
                   <ha-switch
                     .checked=${config.is_transparent || false}
-                    .configValue=${"is_transparent"}
-                    @change=${this._valueChanged}
+                    @change=${(ev) => this._valueChanged(ev, "is_transparent")}
                   ></ha-switch>
                 </ha-formfield>
               ${["ticker-tape", "tickers", "market-quotes"].includes(config.widget_type) ? html`
                 <ha-formfield .label=${"Show Symbol Logo"}>
                   <ha-switch
                     .checked=${config.show_symbol_logo !== false}
-                    .configValue=${"show_symbol_logo"}
-                    @change=${this._valueChanged}
+                    @change=${(ev) => this._valueChanged(ev, "show_symbol_logo")}
                   ></ha-switch>
                 </ha-formfield>
               ` : ""}
@@ -822,10 +821,28 @@ class TradingViewWidgetCardEditor extends LitElement {
       </div>
     `;
   }
+  
   _renderDynamicOptions(widgetType, config) {
     if (!widgetType) {
       return html``;
     }
+    
+    const renderTextField = (label, helperText, val, configVal) => html`
+      <ha-textfield
+        label=${label}
+        .value=${val}
+        helper=${helperText}
+        @input=${(ev) => this._valueChanged(ev, configVal)}
+      ></ha-textfield>`;
+      
+    const renderSwitch = (label, checked, configVal) => html`
+      <ha-formfield .label=${label}>
+        <ha-switch
+          .checked=${checked}
+          @change=${(ev) => this._valueChanged(ev, configVal)}
+        ></ha-switch>
+      </ha-formfield>`;
+
     if (widgetType === "market-overview" || widgetType === "market-quotes") {
       return html`
             <div class="textarea-container">
@@ -833,12 +850,7 @@ class TradingViewWidgetCardEditor extends LitElement {
                 <textarea
                     class="native-textarea"
                     .value=${config.tab_config || ""}
-                    @input=${ev => this._valueChanged({
-        target: {
-          configValue: "tab_config",
-          value: ev.target.value
-        }
-      })}
+                    @input=${(ev) => this._valueChanged(ev, "tab_config")}
                     rows="10"
                 ></textarea>
                 <div class="helper-text">Format: "TabName:" new line "- Symbol"</div>
@@ -846,7 +858,7 @@ class TradingViewWidgetCardEditor extends LitElement {
             
             ${widgetType === "market-overview" ? html`
             <div class="grid">
-                <ha-select label="Date Range" .value=${config.date_range || "12M"} .configValue=${"date_range"} @selected=${this._valueChanged} @closed=${this._stopEvent} fixedMenuPosition>
+                <ha-select label="Date Range" .value=${config.date_range || "12M"} @selected=${(ev) => this._valueChanged(ev, "date_range")} @closed=${this._stopEvent} fixedMenuPosition>
                     <mwc-list-item value="1D">1 Day</mwc-list-item>
                     <mwc-list-item value="1M">1 Month</mwc-list-item>
                     <mwc-list-item value="3M">3 Months</mwc-list-item>
@@ -857,20 +869,20 @@ class TradingViewWidgetCardEditor extends LitElement {
             </div>
 
             <div class="switch-container">
-                <ha-formfield label="Show Chart"><ha-switch .checked=${config.show_chart !== false} .configValue=${"show_chart"} @change=${this._valueChanged}></ha-switch></ha-formfield>
-                <ha-formfield label="Floating Tooltip"><ha-switch .checked=${config.show_floating_tooltip !== false} .configValue=${"show_floating_tooltip"} @change=${this._valueChanged}></ha-switch></ha-formfield>
+                ${renderSwitch("Show Chart", config.show_chart !== false, "show_chart")}
+                ${renderSwitch("Floating Tooltip", config.show_floating_tooltip !== false, "show_floating_tooltip")}
             </div>
             ` : ""}
         `;
     }
     if (widgetType === "stock-market-hotlists") {
       return html`
-        <ha-select label="Exchange" .value=${config.exchange || "US Exchanges"} .configValue=${"exchange"} @selected=${this._valueChanged} @closed=${this._stopEvent} fixedMenuPosition>
+        <ha-select label="Exchange" .value=${config.exchange || "US Exchanges"} @selected=${(ev) => this._valueChanged(ev, "exchange")} @closed=${this._stopEvent} fixedMenuPosition>
             ${HOTLIST_EXCHANGES.map(ex => html`<mwc-list-item value="${ex.v}">${ex.l}</mwc-list-item>`)}
         </ha-select>
         
         <div class="grid">
-            <ha-select label="Date Range" .value=${config.date_range || "12M"} .configValue=${"date_range"} @selected=${this._valueChanged} @closed=${this._stopEvent} fixedMenuPosition>
+            <ha-select label="Date Range" .value=${config.date_range || "12M"} @selected=${(ev) => this._valueChanged(ev, "date_range")} @closed=${this._stopEvent} fixedMenuPosition>
                 <mwc-list-item value="1D">1 Day</mwc-list-item>
                 <mwc-list-item value="1M">1 Month</mwc-list-item>
                 <mwc-list-item value="3M">3 Months</mwc-list-item>
@@ -881,107 +893,30 @@ class TradingViewWidgetCardEditor extends LitElement {
         </div>
 
         <div class="switch-container">
-            <ha-formfield label="Show Chart"><ha-switch .checked=${config.show_chart !== false} .configValue=${"show_chart"} @change=${this._valueChanged}></ha-switch></ha-formfield>
-            <ha-formfield label="Floating Tooltip"><ha-switch .checked=${config.show_floating_tooltip !== false} .configValue=${"show_floating_tooltip"} @change=${this._valueChanged}></ha-switch></ha-formfield>
+            ${renderSwitch("Show Chart", config.show_chart !== false, "show_chart")}
+            ${renderSwitch("Floating Tooltip", config.show_floating_tooltip !== false, "show_floating_tooltip")}
         </div>
       `;
     }
-    const renderTextField = (label, helperText, val, configVal) => html`
-      <ha-textfield
-        label=${label}
-        .value=${val}
-        .configValue=${configVal}
-        helper=${helperText}
-        @input=${this._valueChanged}
-      ></ha-textfield>`;
-    const renderSwitch = (label, checked, configVal) => html`
-      <ha-formfield .label=${label}>
-        <ha-switch
-          .checked=${checked}
-          .configValue=${configVal}
-          @change=${this._valueChanged}
-        ></ha-switch>
-      </ha-formfield>`;
-    const ETF_SOURCES = [{
-      id: "AllAUEtf",
-      label: "Australia"
-    }, {
-      id: "AllCAEtf",
-      label: "Canada"
-    }, {
-      id: "AllFREtf",
-      label: "France"
-    }, {
-      id: "AllDEEtf",
-      label: "Germany"
-    }, {
-      id: "AllHKEtf",
-      label: "Hong Kong, China"
-    }, {
-      id: "AllINEtf",
-      label: "India"
-    }, {
-      id: "AllILEtf",
-      label: "Israel"
-    }, {
-      id: "AllITEtf",
-      label: "Italy"
-    }, {
-      id: "AllJPEtf",
-      label: "Japan"
-    }, {
-      id: "AllLUEtf",
-      label: "Luxembourg"
-    }, {
-      id: "AllMYEtf",
-      label: "Malaysia"
-    }, {
-      id: "AllNLEtf",
-      label: "Netherlands"
-    }, {
-      id: "AllNZEtf",
-      label: "New Zealand"
-    }, {
-      id: "AllROEtf",
-      label: "Romania"
-    }, {
-      id: "AllSGPEtf",
-      label: "Singapore"
-    }, {
-      id: "AllESEtf",
-      label: "Spain"
-    }, {
-      id: "AllCHEEtf",
-      label: "Switzerland"
-    }, {
-      id: "AllTWEtf",
-      label: "Taiwan, China"
-    }, {
-      id: "AllTHEtf",
-      label: "Thailand"
-    }, {
-      id: "AllTREtf",
-      label: "Turkey"
-    }, {
-      id: "AllAREEtf",
-      label: "UAE"
-    }, {
-      id: "AllUKEtf",
-      label: "UK"
-    }, {
-      id: "AllUSEtf",
-      label: "USA"
-    }, {
-      id: "AllVNEtf",
-      label: "Vietnam"
-    }];
+    
+    const ETF_SOURCES = [
+      { id: "AllAUEtf", label: "Australia" }, { id: "AllCAEtf", label: "Canada" }, { id: "AllFREtf", label: "France" },
+      { id: "AllDEEtf", label: "Germany" }, { id: "AllHKEtf", label: "Hong Kong, China" }, { id: "AllINEtf", label: "India" },
+      { id: "AllILEtf", label: "Israel" }, { id: "AllITEtf", label: "Italy" }, { id: "AllJPEtf", label: "Japan" },
+      { id: "AllLUEtf", label: "Luxembourg" }, { id: "AllMYEtf", label: "Malaysia" }, { id: "AllNLEtf", label: "Netherlands" },
+      { id: "AllNZEtf", label: "New Zealand" }, { id: "AllROEtf", label: "Romania" }, { id: "AllSGPEtf", label: "Singapore" },
+      { id: "AllESEtf", label: "Spain" }, { id: "AllCHEEtf", label: "Switzerland" }, { id: "AllTWEtf", label: "Taiwan, China" },
+      { id: "AllTHEtf", label: "Thailand" }, { id: "AllTREtf", label: "Turkey" }, { id: "AllAREEtf", label: "UAE" },
+      { id: "AllUKEtf", label: "UK" }, { id: "AllUSEtf", label: "USA" }, { id: "AllVNEtf", label: "Vietnam" }
+    ];
+    
     switch (widgetType) {
       case "ticker-tape":
       case "tickers":
         return html`
           ${renderTextField("Symbols (comma-separated)", "e.g: BINANCE:BTCUSDT,BIST:XU100", (config.pairs || []).join(","), "pairs")}
           ${widgetType === "ticker-tape" ? html`
-            <ha-select label="Display Mode" .value=${config.display_mode || "regular"} .configValue=${"display_mode"} @selected=${this._valueChanged} @closed=${this._stopEvent} fixedMenuPosition>
+            <ha-select label="Display Mode" .value=${config.display_mode || "regular"} @selected=${(ev) => this._valueChanged(ev, "display_mode")} @closed=${this._stopEvent} fixedMenuPosition>
               <mwc-list-item value="regular">Regular</mwc-list-item>
               <mwc-list-item value="adaptive">Adaptive</mwc-list-item>
               <mwc-list-item value="compact">Compact</mwc-list-item>
@@ -990,182 +925,60 @@ class TradingViewWidgetCardEditor extends LitElement {
         `;
       case "single-quote":
       case "technical-analysis":
-        const _0xb73398 = widgetType === "technical-analysis" ? html`
+        const taOptions = widgetType === "technical-analysis" ? html`
           <div class="grid">
-            <ha-select label="Time Interval" .value=${config.interval || "1D"} .configValue=${"interval"} @selected=${this._valueChanged} @closed=${this._stopEvent} fixedMenuPosition>
+            <ha-select label="Time Interval" .value=${config.interval || "1D"} @selected=${(ev) => this._valueChanged(ev, "interval")} @closed=${this._stopEvent} fixedMenuPosition>
               ${["1m", "5m", "15m", "1H", "4H", "1D", "1W", "1M"].map(interval => html`<mwc-list-item .value=${interval}>${interval}</mwc-list-item>`)}
             </ha-select>
             ${renderSwitch("Show Interval Tabs", config.show_interval_tabs !== false, "show_interval_tabs")}
           </div>
-          <ha-select label="Display Mode" .value=${config.display_mode || "single"} .configValue=${"display_mode"} @selected=${this._valueChanged} @closed=${this._stopEvent} fixedMenuPosition>
+          <ha-select label="Display Mode" .value=${config.display_mode || "single"} @selected=${(ev) => this._valueChanged(ev, "display_mode")} @closed=${this._stopEvent} fixedMenuPosition>
             <mwc-list-item value="single">Single</mwc-list-item>
             <mwc-list-item value="multiple">Multiple</mwc-list-item>
           </ha-select>
         ` : "";
-        return html`${renderTextField("Symbol", "Just one symbol. e.g: NASDAQ:AAPL", (config.pairs || [""])[0], "pairs")}${_0xb73398}`;
+        return html`${renderTextField("Symbol", "Just one symbol. e.g: NASDAQ:AAPL", (config.pairs || [""])[0], "pairs")}${taOptions}`;
       case "stock-heatmap":
       case "etf-heatmap":
-        const _0x1f969d = widgetType === "stock-heatmap";
-        const SIZES = _0x1f969d ? [{
-          v: "market_cap_basic",
-          n: "Market cap"
-        }, {
-          v: "volume",
-          n: "Volume 1D"
-        }, {
-          v: "volume|1W",
-          n: "Volume 1W"
-        }, {
-          v: "volume|1M",
-          n: "Volume 1M"
-        }, {
-          v: "Value.Traded",
-          n: "Price * Volume (Turnover) 1D"
-        }, {
-          v: "Value.Traded|1W",
-          n: "Price * Volume (Turnover) 1W"
-        }, {
-          v: "Value.Traded|1M",
-          n: "Price * Volume (Turnover) 1M"
-        }, {
-          v: "monoSize",
-          n: "Mono size"
-        }] : [{
-          v: "volume",
-          n: "Volume 1D"
-        }, {
-          v: "volume|1W",
-          n: "Volume 1W"
-        }, {
-          v: "volume|1M",
-          n: "Volume 1M"
-        }, {
-          v: "Value.Traded",
-          n: "Price * Volume (Turnover) 1D"
-        }, {
-          v: "Value.Traded|1W",
-          n: "Price * Volume (Turnover) 1W"
-        }, {
-          v: "Value.Traded|1M",
-          n: "Price * Volume (Turnover) 1M"
-        }, {
-          v: "monoSize",
-          n: "Mono size"
-        }];
+        const isStockHeatmap = widgetType === "stock-heatmap";
+        const SIZES = isStockHeatmap ? [
+          { v: "market_cap_basic", n: "Market cap" }, { v: "volume", n: "Volume 1D" }, { v: "volume|1W", n: "Volume 1W" },
+          { v: "volume|1M", n: "Volume 1M" }, { v: "Value.Traded", n: "Price * Volume (Turnover) 1D" },
+          { v: "Value.Traded|1W", n: "Price * Volume (Turnover) 1W" }, { v: "Value.Traded|1M", n: "Price * Volume (Turnover) 1M" }, { v: "monoSize", n: "Mono size" }
+        ] : [
+          { v: "volume", n: "Volume 1D" }, { v: "volume|1W", n: "Volume 1W" }, { v: "volume|1M", n: "Volume 1M" },
+          { v: "Value.Traded", n: "Price * Volume (Turnover) 1D" }, { v: "Value.Traded|1W", n: "Price * Volume (Turnover) 1W" },
+          { v: "Value.Traded|1M", n: "Price * Volume (Turnover) 1M" }, { v: "monoSize", n: "Mono size" }
+        ];
         const ASSET_CLASSES = ["asset_class", "no_group"];
-        const HEATMAP_COLORS = [{
-          value: "change|60",
-          label: "Change 1h, %"
-        }, {
-          value: "change|240",
-          label: "Change 4h, %"
-        }, {
-          value: "change",
-          label: "Change D"
-        }, {
-          value: "Perf.W",
-          label: "Performance W"
-        }, {
-          value: "Perf.1M",
-          label: "Performance M"
-        }, {
-          value: "Perf.3M",
-          label: "Performance 3M, %"
-        }, {
-          value: "Perf.6M",
-          label: "Performance 6M, %"
-        }, {
-          value: "Perf.Y",
-          label: "Performance Y, %"
-        }, {
-          value: "Perf.YTD",
-          label: "Year-to-Date"
-        }, {
-          value: "premarket_change",
-          label: "Pre-market Change, %"
-        }, {
-          value: "postmarket_change",
-          label: "Post-market Change, %"
-        }, {
-          value: "relative_volume_10d_calc",
-          label: "Relative Volume"
-        }, {
-          value: "Volatility.D",
-          label: "Volatility D, %"
-        }, {
-          value: "gap",
-          label: "Gap, %"
-        }];
-        const ETF_COLORS = [{
-          value: "change",
-          label: "Change D, %"
-        }, {
-          value: "Perf.W",
-          label: "Performance W, %"
-        }, {
-          value: "Perf.1M",
-          label: "Performance M, %"
-        }, {
-          value: "Perf.3M",
-          label: "Performance 3M, %"
-        }, {
-          value: "Perf.6M",
-          label: "Performance 6M, %"
-        }, {
-          value: "Perf.YTD",
-          label: "Performance YTD, %"
-        }, {
-          value: "Perf.Y",
-          label: "Performance Y, %"
-        }, {
-          value: "nav_total_return.1M",
-          label: "NAV total return M"
-        }, {
-          value: "nav_total_return.3M",
-          label: "NAV total return 3M"
-        }, {
-          value: "nav_total_return.YTD",
-          label: "NAV total return YTD"
-        }, {
-          value: "nav_total_return.1Y",
-          label: "NAV total return Y"
-        }, {
-          value: "nav_total_return.3Y",
-          label: "NAV total return 3Y"
-        }, {
-          value: "weight_top_10",
-          label: "Top 10 weight (% in top)"
-        }, {
-          value: "weight_top_25",
-          label: "Top 25 weight (% in top)"
-        }, {
-          value: "Volatility.D",
-          label: "Volatility D, %"
-        }, {
-          value: "Volatility.M",
-          label: "Volatility M, %"
-        }, {
-          value: "beta_1_year",
-          label: "Beta 1Y"
-        }, {
-          value: "beta_3_year",
-          label: "Beta 3Y"
-        }, {
-          value: "beta_5_year",
-          label: "Beta 5Y"
-        }];
+        const HEATMAP_COLORS = [
+          { value: "change|60", label: "Change 1h, %" }, { value: "change|240", label: "Change 4h, %" }, { value: "change", label: "Change D" },
+          { value: "Perf.W", label: "Performance W" }, { value: "Perf.1M", label: "Performance M" }, { value: "Perf.3M", label: "Performance 3M, %" },
+          { value: "Perf.6M", label: "Performance 6M, %" }, { value: "Perf.Y", label: "Performance Y, %" }, { value: "Perf.YTD", label: "Year-to-Date" },
+          { value: "premarket_change", label: "Pre-market Change, %" }, { value: "postmarket_change", label: "Post-market Change, %" },
+          { value: "relative_volume_10d_calc", label: "Relative Volume" }, { value: "Volatility.D", label: "Volatility D, %" }, { value: "gap", label: "Gap, %" }
+        ];
+        const ETF_COLORS = [
+          { value: "change", label: "Change D, %" }, { value: "Perf.W", label: "Performance W, %" }, { value: "Perf.1M", label: "Performance M, %" },
+          { value: "Perf.3M", label: "Performance 3M, %" }, { value: "Perf.6M", label: "Performance 6M, %" }, { value: "Perf.YTD", label: "Performance YTD, %" },
+          { value: "Perf.Y", label: "Performance Y, %" }, { value: "nav_total_return.1M", label: "NAV total return M" }, { value: "nav_total_return.3M", label: "NAV total return 3M" },
+          { value: "nav_total_return.YTD", label: "NAV total return YTD" }, { value: "nav_total_return.1Y", label: "NAV total return Y" },
+          { value: "nav_total_return.3Y", label: "NAV total return 3Y" }, { value: "weight_top_10", label: "Top 10 weight (% in top)" },
+          { value: "weight_top_25", label: "Top 25 weight (% in top)" }, { value: "Volatility.D", label: "Volatility D, %" }, { value: "Volatility.M", label: "Volatility M, %" },
+          { value: "beta_1_year", label: "Beta 1Y" }, { value: "beta_3_year", label: "Beta 3Y" }, { value: "beta_5_year", label: "Beta 5Y" }
+        ];
         return html`
-          ${_0x1f969d ? renderTextField("Data Source", "e.g: SPX500", config.data_source || "", "data_source") : html`<ha-select label="Data Source" .value=${config.data_source || ""} .configValue=${"data_source"} @selected=${this._valueChanged} @closed=${this._stopEvent} fixedMenuPosition>${ETF_SOURCES.map(src => html`<mwc-list-item value="${src.id}">${src.label}</mwc-list-item>`)}</ha-select>`}
-          ${_0x1f969d ? renderTextField("Exchange (Optional)", "e.g: NASDAQ", config.exchange || "", "exchange") : ""}
+          ${isStockHeatmap ? renderTextField("Data Source", "e.g: SPX500", config.data_source || "", "data_source") : html`<ha-select label="Data Source" .value=${config.data_source || ""} @selected=${(ev) => this._valueChanged(ev, "data_source")} @closed=${this._stopEvent} fixedMenuPosition>${ETF_SOURCES.map(src => html`<mwc-list-item value="${src.id}">${src.label}</mwc-list-item>`)}</ha-select>`}
+          ${isStockHeatmap ? renderTextField("Exchange (Optional)", "e.g: NASDAQ", config.exchange || "", "exchange") : ""}
           <div class="grid">
-            <ha-select label="Grouping" .value=${config.grouping || (_0x1f969d ? "sector" : "asset_class")} .configValue=${"grouping"} @selected=${this._valueChanged} @closed=${this._stopEvent} fixedMenuPosition}>
-              ${(_0x1f969d ? ["sector", "no_group"] : ASSET_CLASSES).map(group => html`<mwc-list-item .value=${group}>${group.split("_").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}</mwc-list-item>`)}
+            <ha-select label="Grouping" .value=${config.grouping || (isStockHeatmap ? "sector" : "asset_class")} @selected=${(ev) => this._valueChanged(ev, "grouping")} @closed=${this._stopEvent} fixedMenuPosition}>
+              ${(isStockHeatmap ? ["sector", "no_group"] : ASSET_CLASSES).map(group => html`<mwc-list-item .value=${group}>${group.split("_").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}</mwc-list-item>`)}
             </ha-select>
-            <ha-select label="Block Color" .value=${config.block_color || "change"} .configValue=${"block_color"} @selected=${this._valueChanged} @closed=${this._stopEvent} fixedMenuPosition}>
-              ${_0x1f969d ? HEATMAP_COLORS.map(color => html`<mwc-list-item value="${color.value}">${color.label}</mwc-list-item>`) : ETF_COLORS.map(color => html`<mwc-list-item value="${color.value}">${color.label}</mwc-list-item>`)}
+            <ha-select label="Block Color" .value=${config.block_color || "change"} @selected=${(ev) => this._valueChanged(ev, "block_color")} @closed=${this._stopEvent} fixedMenuPosition}>
+              ${isStockHeatmap ? HEATMAP_COLORS.map(color => html`<mwc-list-item value="${color.value}">${color.label}</mwc-list-item>`) : ETF_COLORS.map(color => html`<mwc-list-item value="${color.value}">${color.label}</mwc-list-item>`)}
             </ha-select>
           </div>
-          <ha-select label="Block Size" .value=${config.block_size || (_0x1f969d ? "market_cap_basic" : "volume")} .configValue=${"block_size"} @selected=${this._valueChanged} @closed=${this._stopEvent} fixedMenuPosition}>
+          <ha-select label="Block Size" .value=${config.block_size || (isStockHeatmap ? "market_cap_basic" : "volume")} @selected=${(ev) => this._valueChanged(ev, "block_size")} @closed=${this._stopEvent} fixedMenuPosition}>
             ${SIZES.map(sz => html`<mwc-list-item .value=${sz.v}>${sz.n}</mwc-list-item>`)}
           </ha-select>
           
@@ -1240,8 +1053,7 @@ class TradingViewWidgetCardEditor extends LitElement {
           <ha-select
               label="Importance Filter"
               .value=${config.importance_filter || "-1,0,1"}
-              .configValue=${"importance_filter"}
-              @selected=${this._valueChanged}
+              @selected=${(ev) => this._valueChanged(ev, "importance_filter")}
               @closed=${this._stopEvent}
               fixedMenuPosition
           >
@@ -1254,32 +1066,17 @@ class TradingViewWidgetCardEditor extends LitElement {
           </ha-select>
         `;
       case "news":
-        const MARKETS = [{
-          id: "crypto",
-          label: "Cryptocurrencies"
-        }, {
-          id: "forex",
-          label: "Currencies"
-        }, {
-          id: "stock",
-          label: "Stocks"
-        }, {
-          id: "index",
-          label: "Indices"
-        }, {
-          id: "futures",
-          label: "Futures"
-        }, {
-          id: "cfd",
-          label: "Bonds"
-        }];
+        const MARKETS = [
+          { id: "crypto", label: "Cryptocurrencies" }, { id: "forex", label: "Currencies" }, { id: "stock", label: "Stocks" },
+          { id: "index", label: "Indices" }, { id: "futures", label: "Futures" }, { id: "cfd", label: "Bonds" }
+        ];
         return html`
-          <ha-select label="Display Mode" .value=${config.display_mode || "adaptive"} .configValue=${"display_mode"} @selected=${this._valueChanged} @closed=${this._stopEvent} fixedMenuPosition>
+          <ha-select label="Display Mode" .value=${config.display_mode || "adaptive"} @selected=${(ev) => this._valueChanged(ev, "display_mode")} @closed=${this._stopEvent} fixedMenuPosition>
             <mwc-list-item value="adaptive">Adaptive</mwc-list-item>
             <mwc-list-item value="regular">Regular</mwc-list-item>
             <mwc-list-item value="compact">Compact</mwc-list-item>
           </ha-select>
-          <ha-select label="Feed Mode" .value=${config.feed_mode || "all_symbols"} .configValue=${"feed_mode"} @selected=${this._valueChanged} @closed=${this._stopEvent} fixedMenuPosition>
+          <ha-select label="Feed Mode" .value=${config.feed_mode || "all_symbols"} @selected=${(ev) => this._valueChanged(ev, "feed_mode")} @closed=${this._stopEvent} fixedMenuPosition>
             <mwc-list-item value="all_symbols">All Symbols</mwc-list-item>
             <mwc-list-item value="symbol">Symbol</mwc-list-item>
             <mwc-list-item value="market">Market</mwc-list-item>
@@ -1288,16 +1085,14 @@ class TradingViewWidgetCardEditor extends LitElement {
             <ha-textfield
               label="Symbol"
               .value=${config.symbol || ""}
-              .configValue=${"symbol"}
-              @input=${this._valueChanged}
+              @input=${(ev) => this._valueChanged(ev, "symbol")}
             ></ha-textfield>
           ` : ""}
           ${config.feed_mode === "market" ? html`
             <ha-select
               label="Market Type"
               .value=${config.market || "crypto"}
-              .configValue=${"market"}
-              @selected=${this._valueChanged}
+              @selected=${(ev) => this._valueChanged(ev, "market")}
               @closed=${this._stopEvent}
               fixedMenuPosition
             >
